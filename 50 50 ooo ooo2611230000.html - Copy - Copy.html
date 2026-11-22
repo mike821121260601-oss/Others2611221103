@@ -1,0 +1,955 @@
+          <!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Футбол-Кружки</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;overflow:hidden;background:#0d1117;color:#e8eef5;
+    font:13px/1.25 system-ui,-apple-system,Segoe UI,Arial,sans-serif;
+    user-select:none;touch-action:none}
+  #app{position:fixed;inset:0;display:flex;flex-direction:column}
+
+  /* --- телевизор (комп-комп) --- */
+  #tv{display:block;width:100%;height:82px;flex:none;background:#05080c;
+      border-bottom:1px solid #253040}
+
+  /* --- игровое поле --- */
+  #boardWrap{flex:1;position:relative;min-height:0;background:#080d12}
+  #c{display:block;width:100%;height:100%;touch-action:none}
+
+  #msg{position:absolute;left:0;right:0;top:8px;text-align:center;pointer-events:none;
+       font-size:15px;font-weight:700;text-shadow:0 2px 6px #000;opacity:0;
+       transition:opacity .25s;z-index:3}
+  #msg.on{opacity:1}
+
+  /* --- панель управления --- */
+  #ctl{flex:none;background:#11161d;border-top:1px solid #253040;padding:5px 6px 6px;
+       display:flex;flex-direction:column;gap:5px}
+  .row{display:flex;align-items:center;gap:6px}
+  .row.wrap{flex-wrap:wrap}
+
+  #wheelA,#wheelB{border-radius:8px;background:#0b1016;border:1px solid #2a3644;
+                  touch-action:none;display:block}
+  #angOut{font:bold 13px ui-monospace,monospace;color:#8fb7ff;min-width:78px;text-align:center;
+          background:#0b1016;border:1px solid #2a3644;border-radius:8px;padding:6px 4px}
+  #turnLbl{flex:1;text-align:center;font-weight:700;font-size:13px}
+  .sc{padding:3px 8px;border-radius:8px;font-size:12px;font-weight:700;border:1px solid #2a3644}
+  .sc.red{background:#3a1418;color:#ff8b8b;border-color:#6b2028}
+  .sc.blue{background:#0e2340;color:#8dc2ff;border-color:#1d4a80}
+
+  #pw{flex:1;-webkit-appearance:none;height:26px;background:transparent;margin:0}
+  #pw::-webkit-slider-runnable-track{height:8px;border-radius:4px;
+     background:linear-gradient(90deg,#2ea043,#d29922,#da3633)}
+  #pw::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;margin-top:-7px;
+     border-radius:50%;background:#e8eef5;border:2px solid #0d1117}
+  #pw::-moz-range-track{height:8px;border-radius:4px;
+     background:linear-gradient(90deg,#2ea043,#d29922,#da3633)}
+  #pw::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:#e8eef5;border:2px solid #0d1117}
+
+  button{border:0;border-radius:9px;font-weight:700;font-family:inherit;cursor:pointer}
+  #go{background:#d29922;color:#111;padding:10px 20px;font-size:15px;letter-spacing:.5px}
+  #go:active{filter:brightness(.85)}
+  #menuBtn{background:#21262d;color:#e8eef5;padding:10px 12px;font-size:15px}
+
+  /* --- меню --- */
+  #menu{position:fixed;inset:0;z-index:20;background:rgba(4,7,11,.93);
+        display:flex;justify-content:center;overflow:auto;padding:16px 12px}
+  #menu.hide{display:none}
+  #menu .in{width:100%;max-width:520px}
+  #menu h1{font-size:20px;margin:4px 0 12px}
+  #menu h3{font-size:12px;color:#8b97a6;margin:14px 0 6px;letter-spacing:.8px;text-transform:uppercase}
+  .mb{display:block;width:100%;margin:6px 0;padding:13px;font-size:15px;
+      background:#1f6feb;color:#fff}
+  .mb.k{background:#8957e5}
+  .mb.g{background:#238636}
+  .mb2{flex:1;padding:11px;font-size:13px;background:#21262d;color:#c8d2de;
+       border:1px solid #303a47}
+  .mb2.on{background:#1f6feb;color:#fff;border-color:#1f6feb}
+  .note{color:#8b97a6;font-size:11.5px;line-height:1.45;margin-top:12px}
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="tv"></canvas>
+  <div id="boardWrap">
+    <canvas id="c"></canvas>
+    <div id="msg"></div>
+  </div>
+  <div id="ctl">
+    <div class="row">
+      <canvas id="wheelA" width="112" height="42"></canvas>
+      <canvas id="wheelB" width="112" height="42"></canvas>
+      <div id="angOut">0.000°</div>
+      <div class="sc red">ЧЕР <b id="sr">0</b></div>
+      <div class="sc blue">СИН <b id="sb">0</b></div>
+    </div>
+    <div class="row">
+      <span id="turnLbl">Хід: Червоні</span>
+    </div>
+    <div class="row">
+      <input id="pw" type="range" min="0" max="1000" value="450">
+      <button id="go">GO</button>
+      <button id="menuBtn">☰</button>
+    </div>
+  </div>
+</div>
+
+<div id="menu">
+  <div class="in">
+    <h1>⚽ Футбол-Кружки</h1>
+    <h3>Режим</h3>
+    <button class="mb" data-mode="hc">Людина — Комп</button>
+    <button class="mb k" data-mode="hk">Людина — Клауд</button>
+    <button class="mb k" data-mode="ck">Комп — Клауд</button>
+    <button class="mb" data-mode="hh" style="background:#4b5563">Людина — Людина</button>
+    <h3>Фігури</h3>
+    <div class="row">
+      <button class="mb2 on" data-shape="circle">Кружки</button>
+      <button class="mb2" data-shape="checker">Шашки</button>
+      <button class="mb2" data-shape="ball">Кулі</button>
+    </div>
+    <button class="mb g" id="startBtn" style="margin-top:14px">Почати гру</button>
+    <div class="note">
+      Дошка з бортами: 50 червоних, 50 синіх, 5 білих.<br>
+      Білі — м'яч. Закоти білу в праві ворота → +1 червоним. В ліві → +1 синім.<br>
+      Тягни по полю — напрямок. Колесо A: 1&nbsp;мм = 1/33°. Колесо B: 1&nbsp;мм = 1/333°.<br>
+      Білі летять 10 діагоналей на повній силі, інші — половину.<br>
+      «Кружки» — прямолінійні, летять у 9 разів менше.
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ==================================================================
+   ФУТБОЛ-КРУЖКИ  —  дошка з бортами, 50 червоних + 50 синіх + 5 білих
+   ================================================================== */
+
+const $  = s => document.querySelector(s);
+const clamp = (v,a,b)=> v<a?a:(v>b?b:v);
+
+/* ------------------------- константи фізики ------------------------- */
+const REST    = 0.82;   // відскок від борту
+const REST_BB = 0.94;   // відскок кулька-кулька
+const MAXV    = 1500;   // стеля швидкості (px/s)
+const FIXED_DT= 1/180;  // крок фізики
+
+/* ------------------------- полотно ------------------------- */
+const cv  = $('#c'),   ctx  = cv.getContext('2d');
+const tvv = $('#tv'),  tctx = tvv.getContext('2d');
+const boardWrap = $('#boardWrap');
+
+let DPR = Math.min(2, window.devicePixelRatio || 1);
+let W = 0, H = 0, DIAG = 1;
+let GOALS = [];
+
+/* ------------------------- стан гри ------------------------- */
+const S = {
+  gen: 0,
+  mode: 'hc',
+  shape: 'circle',
+  turn: 0,                 // 0 = червоні, 1 = сині
+  score: [0,0],
+  running: false,
+  selected: null,
+  angle: 0,
+  power: 0.45,
+  dragging: false,
+};
+
+const pieces = [];         // {x,y,vx,vy,r,m,team,alive}   team 0/1/2(білі)
+
+/* ------------------------- геометрія ------------------------- */
+function computeGoals(){
+  const sd = Math.min(W,H);
+  const gd = sd*0.075;     // глибина воріт
+  const gw = sd*0.34;      // ширина воріт
+  if(W >= H){
+    GOALS = [
+      {x:0,       y:H/2-gw/2, w:gd, h:gw},   // 0 — ліві (червоні захищають)
+      {x:W-gd,    y:H/2-gw/2, w:gd, h:gw}    // 1 — праві (червоні атакують)
+    ];
+  } else {
+    GOALS = [
+      {x:W/2-gw/2, y:0,       w:gw, h:gd},   // 0 — верхні
+      {x:W/2-gw/2, y:H-gd,    w:gw, h:gd}    // 1 — нижні
+    ];
+  }
+}
+const goalCenter = g => ({x:g.x+g.w/2, y:g.y+g.h/2});
+
+/* ------------------------- створення партії ------------------------- */
+function pieceRadius(){ return clamp(Math.min(W,H)*0.026, 5, 15); }
+
+function fillZone(x0,y0,x1,y1, team, count, r){
+  const aw = x1-x0, ah = y1-y0;
+  if(aw<=0||ah<=0) return;
+  let cols = Math.max(1, Math.round(Math.sqrt(count*aw/ah)));
+  let rows = Math.ceil(count/cols);
+  const cw = aw/cols, ch = ah/rows;
+  let i = 0;
+  for(let row=0; row<rows && i<count; row++){
+    for(let col=0; col<cols && i<count; col++){
+      const jx = (Math.random()-0.5)*Math.min(cw,ch)*0.45;
+      const jy = (Math.random()-0.5)*Math.min(cw,ch)*0.45;
+      const x = clamp(x0 + cw*(col+0.5) + jx, r+2, W-r-2);
+      const y = clamp(y0 + ch*(row+0.5) + jy, r+2, H-r-2);
+      pieces.push({x, y, vx:0, vy:0, r, m:r*r, team, alive:true});
+      i++;
+    }
+  }
+}
+
+function newGame(){
+  S.gen++;
+  pieces.length = 0;
+  S.turn = 0; S.score = [0,0]; S.selected = null; S.running = false;
+  S.angle = 0; S.power = 0.45;
+  $('#pw').value = 450;
+
+  computeGoals();
+  const r = pieceRadius();
+  const horizontal = W >= H;
+
+  if(horizontal){
+    const mid = W/2;
+    fillZone(r*2, r*2, mid - r*1.6, H - r*2, 0, 50, r);          // червоні — ліва половина
+    fillZone(mid + r*1.6, r*2, W - r*2, H - r*2, 1, 50, r);      // сині — права половина
+    // 5 білих біля центральної лінії
+    for(let i=0;i<5;i++){
+      const y = H*(0.14 + 0.18*i);
+      pieces.push({x: mid + (Math.random()-0.5)*r*3, y, vx:0, vy:0,
+                   r: r*0.92, m: r*r*0.85, team: 2, alive:true});
+    }
+  } else {
+    const mid = H/2;
+    fillZone(r*2, r*2, W - r*2, mid - r*1.6, 0, 50, r);
+    fillZone(r*2, mid + r*1.6, W - r*2, H - r*2, 1, 50, r);
+    for(let i=0;i<5;i++){
+      const x = W*(0.14 + 0.18*i);
+      pieces.push({x, y: mid + (Math.random()-0.5)*r*3, vx:0, vy:0,
+                   r: r*0.92, m: r*r*0.85, team: 2, alive:true});
+    }
+  }
+  updateHud();
+  flash('Гра почалась');
+}
+
+/* ------------------------- фізика ------------------------- */
+function physics(list, w, h, friction, dt){
+  const n = list.length;
+
+  /* інтеграція + стінки */
+  for(let i=0;i<n;i++){
+    const p = list[i];
+    if(!p.alive) continue;
+    const sp2 = p.vx*p.vx + p.vy*p.vy;
+    if(sp2 > 0){
+      p.x += p.vx*dt;
+      p.y += p.vy*dt;
+      const sp = Math.sqrt(sp2);
+      const ns = sp - friction*dt;
+      if(ns <= 3){ p.vx = 0; p.vy = 0; }
+      else { const k = ns/sp; p.vx *= k; p.vy *= k; }
+    }
+    if(p.x < p.r){ p.x = p.r; p.vx = Math.abs(p.vx)*REST; }
+    else if(p.x > w-p.r){ p.x = w-p.r; p.vx = -Math.abs(p.vx)*REST; }
+    if(p.y < p.r){ p.y = p.r; p.vy = Math.abs(p.vy)*REST; }
+    else if(p.y > h-p.r){ p.y = h-p.r; p.vy = -Math.abs(p.vy)*REST; }
+  }
+
+  /* зіткнення */
+  for(let i=0;i<n;i++){
+    const a = list[i];
+    if(!a.alive) continue;
+    for(let j=i+1;j<n;j++){
+      const b = list[j];
+      if(!b.alive) continue;
+      const dx = b.x-a.x, dy = b.y-a.y;
+      const rs = a.r + b.r;
+      const d2 = dx*dx + dy*dy;
+      if(d2 >= rs*rs || d2 < 1e-9) continue;
+
+      const d  = Math.sqrt(d2);
+      const nx = dx/d, ny = dy/d;
+      const ov = rs - d;
+      const ima = 1/a.m, imb = 1/b.m, ims = ima + imb;
+
+      a.x -= nx*ov*(ima/ims);  a.y -= ny*ov*(ima/ims);
+      b.x += nx*ov*(imb/ims);  b.y += ny*ov*(imb/ims);
+
+      const rvx = b.vx-a.vx, rvy = b.vy-a.vy;
+      const vn  = rvx*nx + rvy*ny;
+      if(vn > 0) continue;
+      const jj = -(1+REST_BB)*vn/ims;
+      a.vx -= jj*nx*ima;  a.vy -= jj*ny*ima;
+      b.vx += jj*nx*imb;  b.vy += jj*ny*imb;
+    }
+  }
+}
+
+function anyMoving(list){
+  for(let i=0;i<list.length;i++){
+    const p = list[i];
+    if(p.vx !== 0 || p.vy !== 0) return true;
+  }
+  return false;
+}
+
+/* ------------------------- швидкості ------------------------- */
+function modeScale(){ return S.shape === 'circle' ? 1/9 : 1; }
+
+function frictionAccel(){ return 0.36 * DIAG; }
+
+function whiteMaxSpeed(){
+  const a = frictionAccel();
+  const D = 10 * DIAG * modeScale();          // 10 діагоналей
+  return Math.min(MAXV, Math.sqrt(2*a*D));
+}
+function pieceMaxSpeed(team){
+  const wm = whiteMaxSpeed();
+  return team === 2 ? wm : wm*0.5;            // інші — половина
+}
+
+/* ------------------------- постріл ------------------------- */
+function fire(){
+  if(S.running || !S.selected) return;
+  const p = S.selected;
+  const v = pieceMaxSpeed(p.team) * S.power;
+  p.vx = Math.cos(S.angle) * v;
+  p.vy = Math.sin(S.angle) * v;
+  S.running = true;
+  S.selected = null;
+}
+
+/* ------------------------- голи ------------------------- */
+function checkGoals(){
+  for(let i=0;i<pieces.length;i++){
+    const p = pieces[i];
+    if(p.team !== 2 || !p.alive) continue;
+    for(let gi=0; gi<2; gi++){
+      const g = GOALS[gi];
+      if(p.x > g.x && p.x < g.x+g.w && p.y > g.y && p.y < g.y+g.h){
+        const scorer = (gi === 1) ? 0 : 1;   // праві ворота → червоним
+        S.score[scorer]++;
+        updateHud();
+        flash(scorer === 0 ? '⚽ ГОЛ! Червоні +1' : '⚽ ГОЛ! Сині +1');
+        p.x = W/2 + (Math.random()-0.5)*W*0.06;
+        p.y = H/2 + (Math.random()-0.5)*H*0.06;
+        p.vx = 0; p.vy = 0;
+      }
+    }
+  }
+}
+
+/* ------------------------- черговість ------------------------- */
+function isAITurn(){
+  if(S.mode === 'ck') return true;
+  if(S.mode === 'hh') return false;
+  return S.turn === 1;          // hc / hk — людина завжди червоні
+}
+
+function endTurn(){
+  S.running = false;
+  S.selected = null;
+  S.turn = 1 - S.turn;
+  updateHud();
+  if(isAITurn()){
+    const g = S.gen;
+    setTimeout(()=>{ if(g === S.gen && !S.running) aiPlay(); }, 750);
+  }
+}
+
+/* ------------------------- ШІ ------------------------- */
+function pickShot(team, noise){
+  const gc = goalCenter(GOALS[1-team]);     // атакуємо ворота суперника
+  const ws = pieces.filter(p=>p.team===2);
+  let best = null;
+
+  for(let i=0;i<pieces.length;i++){
+    const p = pieces[i];
+    if(p.team !== team || !p.alive) continue;
+    for(let k=0;k<ws.length;k++){
+      const w = ws[k];
+      const dx = w.x-p.x, dy = w.y-p.y;
+      const d = Math.hypot(dx,dy);
+      if(d < 1) continue;
+      const ux = dx/d, uy = dy/d;
+      const tx = gc.x-w.x, ty = gc.y-w.y;
+      const td = Math.hypot(tx,ty) || 1;
+      const cos = (ux*tx + uy*ty)/td;
+      const val = cos*2.2 - d/(DIAG*0.6) - Math.abs(p.x-w.x)/(DIAG);
+      if(!best || val > best.val) best = {val, p, ux, uy, cos};
+    }
+  }
+  if(!best) return null;
+  return {
+    p: best.p,
+    angle: Math.atan2(best.uy, best.ux) + (Math.random()-0.5)*noise,
+    power: clamp(0.48 + 0.42*Math.max(0,best.cos), 0.35, 0.95)
+  };
+}
+
+function aiPlay(){
+  const team = S.turn;
+  const noise = (S.mode === 'hk') ? 0.035 : 0.11;   // «Клауд» точніший
+  const shot = pickShot(team, noise);
+  if(!shot) return;
+  S.selected = shot.p;
+  S.angle = shot.angle;
+  S.power = shot.power;
+  $('#pw').value = Math.round(shot.power*1000);
+  updateAngleLabel();
+  const g = S.gen;
+  setTimeout(()=>{ if(g === S.gen && !S.running) fire(); }, 420);
+}
+
+/* ==================================================================
+   ТЕЛЕВІЗОР — гра Комп vs Комп (жовтий м'яч, оранжеві та зелені)
+   ================================================================== */
+const TV = {
+  pieces: [], w:0, h:0, goals:[], friction:0,
+  running:false, cool:0.6, acc:0, score:[0,0]
+};
+
+function tvInit(){
+  const rw = tvv.clientWidth || 360;
+  const rh = tvv.clientHeight || 82;
+  tvv.width  = Math.round(rw*DPR);
+  tvv.height = Math.round(rh*DPR);
+  tctx.setTransform(DPR,0,0,DPR,0,0);
+
+  TV.w = rw; TV.h = rh;
+  TV.goals = [
+    {x:0,          y:rh/2-rh*0.20, w:rw*0.045, h:rh*0.40},
+    {x:rw-rw*0.045,y:rh/2-rh*0.20, w:rw*0.045, h:rh*0.40}
+  ];
+  TV.pieces.length = 0;
+  TV.score = [0,0];
+  TV.running = false; TV.cool = 0.5; TV.acc = 0;
+
+  const r = Math.max(3, rh*0.062);
+  TV.pieces.push({x:rw/2, y:rh/2, vx:0, vy:0, r:r*0.82, m:r*r*0.7, team:2, alive:true});
+
+  for(let i=0;i<6;i++){
+    TV.pieces.push({x: rw*0.10 + Math.random()*rw*0.24,
+                    y: rh*0.15 + Math.random()*rh*0.70,
+                    vx:0, vy:0, r, m:r*r, team:0, alive:true});
+    TV.pieces.push({x: rw*0.66 + Math.random()*rw*0.24,
+                    y: rh*0.15 + Math.random()*rh*0.70,
+                    vx:0, vy:0, r, m:r*r, team:1, alive:true});
+  }
+  TV.friction = Math.hypot(rw,rh)*1.05;
+}
+
+function tvShoot(){
+  const team = Math.random() < 0.5 ? 0 : 1;
+  const ball = TV.pieces.find(p=>p.team===2);
+  if(!ball) return;
+  const gc = goalCenter(TV.goals[1-team]);
+  let best = null;
+
+  for(let i=0;i<TV.pieces.length;i++){
+    const p = TV.pieces[i];
+    if(p.team !== team) continue;
+    const dx = ball.x-p.x, dy = ball.y-p.y;
+    const d = Math.hypot(dx,dy); if(d < 1) continue;
+    const ux = dx/d, uy = dy/d;
+    const tx = gc.x-ball.x, ty = gc.y-ball.y;
+    const td = Math.hypot(tx,ty) || 1;
+    const sc = (ux*tx + uy*ty)/td;
+    if(!best || sc > best.sc) best = {sc, p, ux, uy};
+  }
+  if(!best) return;
+  const ang = Math.atan2(best.uy, best.ux) + (Math.random()-0.5)*0.30;
+  const v = TV.w*0.55 + Math.random()*TV.w*0.55;
+  best.p.vx = Math.cos(ang)*v;
+  best.p.vy = Math.sin(ang)*v;
+  TV.running = true;
+}
+
+function tvUpdate(dt){
+  if(TV.running){
+    TV.acc += dt;
+    let steps = 0;
+    while(TV.acc >= FIXED_DT && steps < 260){
+      physics(TV.pieces, TV.w, TV.h, TV.friction, FIXED_DT);
+      TV.acc -= FIXED_DT; steps++;
+    }
+    /* гол */
+    const ball = TV.pieces.find(p=>p.team===2);
+    if(ball){
+      for(let gi=0; gi<2; gi++){
+        const g = TV.goals[gi];
+        if(ball.x > g.x && ball.x < g.x+g.w && ball.y > g.y && ball.y < g.y+g.h){
+          TV.score[gi===1?0:1]++;
+          ball.x = TV.w/2; ball.y = TV.h/2; ball.vx = 0; ball.vy = 0;
+        }
+      }
+    }
+    if(!anyMoving(TV.pieces)){ TV.running = false; TV.cool = 0.75; }
+  } else {
+    TV.cool -= dt;
+    if(TV.cool <= 0){ tvShoot(); TV.cool = 0.35; }
+  }
+}
+
+function tvDraw(){
+  tctx.clearRect(0,0,TV.w,TV.h);
+  const g = tctx.createLinearGradient(0,0,0,TV.h);
+  g.addColorStop(0,'#0a1a10'); g.addColorStop(1,'#050d09');
+  tctx.fillStyle = g; tctx.fillRect(0,0,TV.w,TV.h);
+
+  /* центральна лінія */
+  tctx.strokeStyle = 'rgba(255,255,255,.10)';
+  tctx.lineWidth = 1;
+  tctx.beginPath(); tctx.moveTo(TV.w/2,0); tctx.lineTo(TV.w/2,TV.h); tctx.stroke();
+
+  /* ворота */
+  for(let i=0;i<2;i++){
+    const gg = TV.goals[i];
+    tctx.fillStyle = 'rgba(255,255,255,.08)';
+    tctx.fillRect(gg.x, gg.y, gg.w, gg.h);
+    tctx.strokeStyle = 'rgba(255,255,255,.22)';
+    tctx.strokeRect(gg.x+.5, gg.y+.5, gg.w-1, gg.h-1);
+  }
+
+  /* фігури */
+  for(let i=0;i<TV.pieces.length;i++){
+    const p = TV.pieces[i];
+    tctx.beginPath();
+    tctx.arc(p.x, p.y, p.r, 0, 6.2832);
+    tctx.fillStyle = p.team===2 ? '#f2cc60' : (p.team===0 ? '#f0883e' : '#3fb950');
+    tctx.fill();
+  }
+
+  /* табло */
+  tctx.fillStyle = 'rgba(0,0,0,.55)';
+  tctx.fillRect(TV.w/2-46, 3, 92, 16);
+  tctx.font = 'bold 11px ui-monospace,monospace';
+  tctx.textAlign = 'center'; tctx.textBaseline = 'middle';
+  tctx.fillStyle = '#f0883e'; tctx.fillText(String(TV.score[0]), TV.w/2-26, 11);
+  tctx.fillStyle = '#6e7681'; tctx.fillText(':', TV.w/2, 11);
+  tctx.fillStyle = '#3fb950'; tctx.fillText(String(TV.score[1]), TV.w/2+26, 11);
+
+  tctx.fillStyle = 'rgba(139,151,166,.75)';
+  tctx.font = '9px system-ui,sans-serif';
+  tctx.textAlign = 'left';
+  tctx.fillText('📺 КОМП — КОМП', 6, 11);
+}
+
+/* ==================================================================
+   МАЛЮВАННЯ ДОШКИ
+   ================================================================== */
+function teamColor(team){
+  return team===0 ? '#e5484d' : team===1 ? '#3e8ce8' : '#f0f3f8';
+}
+
+function drawPiece(g, p){
+  const {x, y, r} = p;
+  const col = teamColor(p.team);
+  g.beginPath(); g.arc(x, y, r, 0, 6.2832); g.fillStyle = col; g.fill();
+
+  if(S.shape === 'ball'){
+    g.beginPath(); g.arc(x - r*0.30, y - r*0.32, r*0.30, 0, 6.2832);
+    g.fillStyle = 'rgba(255,255,255,.65)'; g.fill();
+    g.beginPath(); g.arc(x, y, r*0.90, 0, 6.2832);
+    g.strokeStyle = 'rgba(255,255,255,.45)';
+    g.lineWidth = Math.max(1, r*0.12); g.stroke();
+  } else if(S.shape === 'checker'){
+    g.beginPath(); g.arc(x, y, r*0.58, 0, 6.2832);
+    g.strokeStyle = 'rgba(0,0,0,.38)';
+    g.lineWidth = Math.max(1, r*0.22); g.stroke();
+    g.beginPath(); g.arc(x, y, r*0.96, 0, 6.2832);
+    g.strokeStyle = 'rgba(255,255,255,.22)';
+    g.lineWidth = Math.max(1, r*0.10); g.stroke();
+  } else {
+    g.beginPath(); g.arc(x, y, r, 0, 6.2832);
+    g.strokeStyle = 'rgba(0,0,0,.42)'; g.lineWidth = 1; g.stroke();
+  }
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+
+  /* --- трава --- */
+  const bg = ctx.createRadialGradient(W/2, H/2, Math.min(W,H)*0.15,
+                                      W/2, H/2, Math.max(W,H)*0.75);
+  bg.addColorStop(0, '#153a24');
+  bg.addColorStop(1, '#0a1c12');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0,0,W,H);
+
+  /* --- половини --- */
+  if(W >= H){
+    ctx.fillStyle = 'rgba(229,72,77,.055)';  ctx.fillRect(0,0,W/2,H);
+    ctx.fillStyle = 'rgba(62,140,232,.055)'; ctx.fillRect(W/2,0,W/2,H);
+  } else {
+    ctx.fillStyle = 'rgba(229,72,77,.055)';  ctx.fillRect(0,0,W,H/2);
+    ctx.fillStyle = 'rgba(62,140,232,.055)'; ctx.fillRect(0,H/2,W,H/2);
+  }
+
+  /* --- центральна лінія --- */
+  ctx.strokeStyle = 'rgba(255,255,255,.16)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  if(W >= H){ ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); }
+  else       { ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); }
+  ctx.stroke();
+
+  /* --- ворота --- */
+  for(let i=0;i<2;i++){
+    const g = GOALS[i];
+    const attacking = (i === 1);           // праві/нижні — ціль червоних
+    ctx.fillStyle = attacking ? 'rgba(229,72,77,.20)' : 'rgba(62,140,232,.20)';
+    ctx.fillRect(g.x, g.y, g.w, g.h);
+    ctx.strokeStyle = attacking ? 'rgba(255,120,120,.85)' : 'rgba(120,180,255,.85)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(g.x+1, g.y+1, g.w-2, g.h-2);
+
+    /* пульсуюча точка */
+    const c = goalCenter(g);
+    const pulse = 0.55 + 0.45*Math.sin(performance.now()/380);
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, Math.min(g.w,g.h)*0.22, 0, 6.2832);
+    ctx.fillStyle = attacking ? `rgba(255,90,90,${0.35+0.4*pulse})`
+                              : `rgba(90,160,255,${0.35+0.4*pulse})`;
+    ctx.fill();
+  }
+
+  /* --- фігури --- */
+  for(let i=0;i<pieces.length;i++) drawPiece(ctx, pieces[i]);
+
+  /* --- вибрана фігура + стрілка --- */
+  if(S.selected){
+    const p = S.selected;
+
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r*1.9, 0, 6.2832);
+    ctx.strokeStyle = 'rgba(255,216,74,.95)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    const len = p.r*2 + 34 + 110*S.power;
+    const ex = p.x + Math.cos(S.angle)*len;
+    const ey = p.y + Math.sin(S.angle)*len;
+
+    ctx.save();
+    ctx.setLineDash([7,5]);
+    ctx.strokeStyle = 'rgba(255,216,74,.85)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(ex, ey); ctx.stroke();
+    ctx.restore();
+
+    /* наконечник */
+    const hw = 9, hl = 15;
+    const c = Math.cos(S.angle), s = Math.sin(S.angle);
+    ctx.beginPath();
+    ctx.moveTo(ex, ey);
+    ctx.lineTo(ex - c*hl - s*hw, ey - s*hl + c*hw);
+    ctx.lineTo(ex - c*hl + s*hw, ey - s*hl - c*hw);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255,216,74,.95)';
+    ctx.fill();
+
+    /* точка старту */
+    ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, 6.2832);
+    ctx.fillStyle = '#ffd84a'; ctx.fill();
+  }
+
+  /* --- борти --- */
+  ctx.strokeStyle = 'rgba(140,160,180,.55)';
+  ctx.lineWidth = 6;
+  ctx.strokeRect(3, 3, W-6, H-6);
+  ctx.strokeStyle = 'rgba(0,0,0,.55)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(1, 1, W-2, H-2);
+}
+
+/* ==================================================================
+   ГОЛОВНИЙ ЦИКЛ
+   ================================================================== */
+let lastT = 0, acc = 0;
+
+function loop(t){
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (t - lastT)/1000 || 0);
+  lastT = t;
+
+  /* --- основна гра --- */
+  if(S.running){
+    acc += dt;
+    let steps = 0;
+    while(acc >= FIXED_DT && steps < 8){
+      physics(pieces, W, H, frictionAccel(), FIXED_DT);
+      acc -= FIXED_DT;
+      steps++;
+      checkGoals();
+    }
+    if(acc > 0.4) acc = 0.4;
+    if(!anyMoving(pieces)){ acc = 0; endTurn(); }
+  }
+
+  /* --- телевізор --- */
+  tvUpdate(dt);
+
+  draw();
+  tvDraw();
+}
+
+/* ==================================================================
+   ІНТЕРФЕЙС
+   ================================================================== */
+function updateHud(){
+  $('#sr').textContent = S.score[0];
+  $('#sb').textContent = S.score[1];
+  $('#turnLbl').textContent = S.turn === 0 ? 'Хід: Червоні' : 'Хід: Сині';
+}
+
+let msgTimer = null;
+function flash(text){
+  const m = $('#msg');
+  m.textContent = text;
+  m.classList.add('on');
+  clearTimeout(msgTimer);
+  msgTimer = setTimeout(()=>m.classList.remove('on'), 1400);
+}
+
+function updateAngleLabel(){
+  let deg = S.angle * 180 / Math.PI;
+  deg = ((deg % 360) + 360) % 360;
+  $('#angOut').textContent = deg.toFixed(3) + '°';
+}
+
+/* ---------- колеса точного кута ---------- */
+const PX_PER_MM = 3.7795;
+
+function makeWheel(el, degPerMm, color){
+  const g = el.getContext('2d');
+  let drag = false, lx = 0;
+
+  el.addEventListener('pointerdown', e=>{
+    drag = true; lx = e.clientX;
+    el.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  el.addEventListener('pointermove', e=>{
+    if(!drag) return;
+    const dx = e.clientX - lx;
+    lx = e.clientX;
+    /* 1 мм руху = degPerMm градусів */
+    const degPerPx = degPerMm / PX_PER_MM;
+    S.angle += dx * degPerPx * Math.PI/180;
+    updateAngleLabel();
+    e.preventDefault();
+  });
+  const stop = ()=>{ drag = false; };
+  el.addEventListener('pointerup', stop);
+  el.addEventListener('pointercancel', stop);
+
+  return function drawWheel(){
+    const w = el.width, h = el.height;
+    g.clearRect(0,0,w,h);
+    g.fillStyle = '#0b1016';
+    g.fillRect(0,0,w,h);
+
+    const cx = w/2, cy = h/2, rad = Math.min(w,h)*0.36;
+    g.strokeStyle = 'rgba(120,140,165,.45)';
+    g.lineWidth = 1.4;
+    g.beginPath(); g.arc(cx, cy, rad, 0, 6.2832); g.stroke();
+
+    /* поділки */
+    for(let i=0;i<12;i++){
+      const a = i*Math.PI/6;
+      const r1 = rad*0.76, r2 = rad;
+      g.strokeStyle = 'rgba(120,140,165,.30)';
+      g.beginPath();
+      g.moveTo(cx+Math.cos(a)*r1, cy+Math.sin(a)*r1);
+      g.lineTo(cx+Math.cos(a)*r2, cy+Math.sin(a)*r2);
+      g.stroke();
+    }
+
+    /* стрілка */
+    const a = S.angle;
+    g.strokeStyle = color;
+    g.lineWidth = 2.4;
+    g.beginPath();
+    g.moveTo(cx, cy);
+    g.lineTo(cx+Math.cos(a)*rad*0.92, cy+Math.sin(a)*rad*0.92);
+    g.stroke();
+
+    g.beginPath(); g.arc(cx, cy, 2.6, 0, 6.2832);
+    g.fillStyle = color; g.fill();
+
+    g.font = '8px system-ui,sans-serif';
+    g.fillStyle = 'rgba(160,175,195,.8)';
+    g.textAlign = 'left'; g.textBaseline = 'top';
+    g.fillText(degPerMm > 0.02 ? '×1/33°' : '×1/333°', 4, 3);
+  };
+}
+
+const wheelA = makeWheel($('#wheelA'), 1/33,  '#ffd84a');   // 1 мм = 1/33°
+const wheelB = makeWheel($('#wheelB'), 1/333, '#58a6ff');   // 1 мм = 1/333°
+
+/* ---------- мишка / палець по полю ---------- */
+function canvasPos(e){
+  const r = cv.getBoundingClientRect();
+  return {x: e.clientX - r.left, y: e.clientY - r.top};
+}
+
+function nearestOwn(x, y){
+  let best = null, bd = Infinity;
+  for(let i=0;i<pieces.length;i++){
+    const p = pieces[i];
+    if(p.team !== S.turn) continue;
+    const d = (p.x-x)*(p.x-x) + (p.y-y)*(p.y-y);
+    if(d < bd){ bd = d; best = p; }
+  }
+  return {piece: best, dist2: bd};
+}
+
+cv.addEventListener('pointerdown', e=>{
+  if(S.running || isAITurn()) return;
+  const {x, y} = canvasPos(e);
+
+  /* повторний вибір іншої своєї фігури */
+  if(S.selected){
+    const n = nearestOwn(x, y);
+    if(n.piece && n.piece !== S.selected &&
+       n.dist2 < (n.piece.r*1.9)*(n.piece.r*1.9)){
+      S.selected = n.piece;
+    }
+  } else {
+    const n = nearestOwn(x, y);
+    if(n.piece && n.dist2 < (n.piece.r*9)*(n.piece.r*9)){
+      S.selected = n.piece;
+    } else {
+      return;
+    }
+  }
+
+  S.dragging = true;
+  S.angle = Math.atan2(y - S.selected.y, x - S.selected.x);
+  updateAngleLabel();
+  cv.setPointerCapture(e.pointerId);
+  e.preventDefault();
+}, {passive:false});
+
+cv.addEventListener('pointermove', e=>{
+  if(!S.dragging || !S.selected) return;
+  const {x, y} = canvasPos(e);
+  S.angle = Math.atan2(y - S.selected.y, x - S.selected.x);
+  updateAngleLabel();
+  e.preventDefault();
+}, {passive:false});
+
+function endDrag(e){ S.dragging = false; }
+cv.addEventListener('pointerup', endDrag);
+cv.addEventListener('pointercancel', endDrag);
+
+/* ---------- кнопки ---------- */
+$('#go').addEventListener('click', ()=>{
+  if(S.running) return;
+  if(!S.selected){ flash('Спочатку виберіть фігуру'); return; }
+  fire();
+});
+
+$('#pw').addEventListener('input', e=>{
+  S.power = (+e.target.value)/1000;
+});
+
+/* ---------- меню ---------- */
+$('#menuBtn').addEventListener('click', ()=>{
+  $('#menu').classList.remove('hide');
+});
+
+document.querySelectorAll('.mb[data-mode]').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    S.mode = b.dataset.mode;
+    document.querySelectorAll('.mb[data-mode]').forEach(x=>x.style.outline='');
+    b.style.outline = '3px solid #ffd84a';
+  });
+});
+
+document.querySelectorAll('.mb2[data-shape]').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    S.shape = b.dataset.shape;
+    document.querySelectorAll('.mb2').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on');
+  });
+});
+
+$('#startBtn').addEventListener('click', ()=>{
+  $('#menu').classList.add('hide');
+  resize();
+  newGame();
+  if(isAITurn()){
+    const g = S.gen;
+    setTimeout(()=>{ if(g === S.gen && !S.running) aiPlay(); }, 900);
+  }
+});
+
+/* ==================================================================
+   РОЗМІРИ
+   ================================================================== */
+function resize(){
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+
+  const rw = boardWrap.clientWidth;
+  const rh = boardWrap.clientHeight;
+  if(rw < 20 || rh < 20) return;
+
+  const oldW = W, oldH = H;
+  W = rw; H = rh;
+
+  cv.width  = Math.round(W*DPR);
+  cv.height = Math.round(H*DPR);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+
+  if(oldW > 0 && oldH > 0 && pieces.length){
+    const sx = W/oldW, sy = H/oldH;
+    const nr = pieceRadius();
+    for(let i=0;i<pieces.length;i++){
+      const p = pieces[i];
+      p.x *= sx; p.y *= sy;
+      p.r = (p.team === 2) ? nr*0.92 : nr;
+      p.m = p.r*p.r;
+      p.x = clamp(p.x, p.r+1, W-p.r-1);
+      p.y = clamp(p.y, p.r+1, H-p.r-1);
+    }
+  }
+
+  DIAG = Math.hypot(W,H);
+  computeGoals();
+  tvInit();
+}
+
+/* ==================================================================
+   СТАРТ
+   ================================================================== */
+window.addEventListener('resize', ()=>{ resize(); });
+if(window.ResizeObserver){
+  new ResizeObserver(()=>{ resize(); }).observe(boardWrap);
+}
+
+function boot(){
+  resize();
+  computeGoals();
+  newGame();
+  updateAngleLabel();
+  requestAnimationFrame(loop);
+}
+
+/* перемальовка коліс щокадру */
+(function wheelLoop(){
+  requestAnimationFrame(wheelLoop);
+  wheelA();
+  wheelB();
+})();
+
+boot();
+</script>
+</body>
+</html>
